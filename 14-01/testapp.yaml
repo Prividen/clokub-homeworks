@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: testapp-14-01
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes  1;
+    error_log  /dev/stderr;
+    events {
+      worker_connections  1024;
+    }
+    http {
+      access_log        /dev/stdout;
+
+      server {
+          listen       80;
+          server_name  _;
+          include root-location.conf;
+      }
+
+      server {
+          listen       443 ssl;
+          ssl_certificate /etc/tls/tls.crt;
+          ssl_certificate_key /etc/tls/tls.key;
+          server_name  _;
+          include root-location.conf;
+      }
+
+    }
+
+  root-location.conf: |
+    location / {
+        root   /html;
+        index  index.html index.htm;
+    }
+
+  index.html: |
+    <html><body>
+    <h1>Hello</h1>
+    <p>Password of the day: <a href="passwords/password.txt">Get it!</a></p>
+    </body></html>
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testapp-14-01
+spec:
+  selector:
+    matchLabels:
+      app: testapp-14-01
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: testapp-14-01
+    spec:
+      terminationGracePeriodSeconds: 3
+      initContainers:
+        - name: set-password
+          image: busybox:latest
+          imagePullPolicy: IfNotPresent
+          command: [ 'sh', '-c', 'echo $PASSWORD >/passwords/password.txt'  ]
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: password-of-day
+                  key: password
+          volumeMounts:
+            - name: passwords
+              mountPath: /passwords
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx
+              readOnly: true
+            - name: html-docs
+              mountPath: /html
+              readOnly: true
+            - name: cert
+              mountPath: /etc/tls
+              readOnly: true
+            - name: passwords
+              mountPath: /html/passwords
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: testapp-14-01
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+              - key: root-location.conf
+                path: root-location.conf
+        - name: html-docs
+          configMap:
+            name: testapp-14-01
+            items:
+              - key: index.html
+                path: index.html
+        - name: cert
+          secret:
+            secretName: testapp-cert
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+                mode: 0400
+        - name: passwords
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testapp-14-01
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+  selector:
+    app: testapp-14-01
