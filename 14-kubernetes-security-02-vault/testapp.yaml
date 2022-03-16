@@ -1,0 +1,124 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-secret
+type: Opaque
+data:
+  secret: QmlnIHNlY3JldCEhIQ==
+  vault_token: RXAwUUY1SUpmVlR3
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+spec:
+  selector:
+    matchLabels:
+      app: vault
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vault
+    spec:
+      terminationGracePeriodSeconds: 3
+      containers:
+        - name: vault
+          image: vault
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8200
+          env:
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: vault-secret
+                  key: vault_token
+            - name: VAULT_DEV_LISTEN_ADDRESS
+              value: 0.0.0.0:8200
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-vault-client
+spec:
+  selector:
+    matchLabels:
+      app: test-vault-client
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: test-vault-client
+    spec:
+      terminationGracePeriodSeconds: 3
+      initContainers:
+        - name: set-secret
+          image: fedora:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - 'sh'
+            - '-c'
+            - >
+              while true; do sleep 1s; eval $(echo curl -H \"X-Vault-Token: ${VAULT_TOKEN}\" -X POST
+              -d \"{\\\"data\\\":{\\\"secret\\\": \\\"${SECRET}\\\"}}\"
+              $VAULT_ADDR/v1/secret/data/netology) && break; done
+          env:
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vault-secret
+                  key: vault_token
+            - name: VAULT_ADDR
+              value: http://vault:8200
+            - name: SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vault-secret
+                  key: secret
+      containers:
+        - name: test-vault-client
+          image: prividen/test-vault-client
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vault-secret
+                  key: vault_token
+            - name: VAULT_ADDR
+              value: http://vault:8200
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+spec:
+  type: ClusterIP
+  ports:
+    - name: vault-http
+      port: 8200
+      targetPort: 8200
+  selector:
+    app: vault
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-vault-client
+spec:
+  type: LoadBalancer
+  ports:
+    - name: api-http
+      port: 80
+      targetPort: 8080
+  selector:
+    app: test-vault-client
+
