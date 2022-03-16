@@ -63,7 +63,7 @@ spec:
             - 'sh'
             - '-c'
             - >
-              while true; do sleep 1s; eval $(echo curl -H \"X-Vault-Token: ${VAULT_TOKEN}\" -X POST
+              while true; do sleep 1s; eval $(echo curl --fail -H \"X-Vault-Token: ${VAULT_TOKEN}\" -X POST
               -d \"{\\\"data\\\":{\\\"secret\\\": \\\"${SECRET}\\\"}}\"
               $VAULT_ADDR/v1/secret/data/netology) && break; done
           env:

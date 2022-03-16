@@ -5,7 +5,7 @@
 
 Наш [vault-клиент](vault-client.py) будет читать из Vault'а свой секрет и отдавать его по HTTP API (`/get_secret` endpoint). 
 
-[Соберём](Dockerfile) с этим клиентом и всеми его питоно-зависимостями [контейнер](https://hub.docker.com/r/prividen/test-vault-client).
+[Соберём](Dockerfile) с этим клиентом и всеми его питоно-зависимостями [образ контейнера](https://hub.docker.com/r/prividen/test-vault-client).
 
 Наше [тестовое приложение](testapp.yaml) будет содержать:
 - секрет с токеном к Vault, и с тем секретом, который мы будем хранить в Vault и показывать через HTTP API;
