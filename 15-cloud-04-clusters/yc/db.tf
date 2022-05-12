@@ -27,12 +27,13 @@ resource "yandex_mdb_mysql_cluster" "netology-db-cluster" {
   # Включить защиту кластера от непреднамеренного удаления
   deletion_protection = true
 
+  # Создать БД с именем `netology_db`
   database {
     name = local.db.name
   }
 
   user {
-    # Создать БД с именем `netology_db` c логином и паролем
+    # c логином и паролем
     name     = local.db.user
     password = local.db.password
     permission {
